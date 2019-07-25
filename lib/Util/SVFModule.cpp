@@ -190,24 +190,26 @@ void LLVMModuleSet::addSVFMain(){
         Type * i8ptr2 = PointerType::getInt8PtrTy(M.getContext())->getPointerTo();
         Type * i32 = IntegerType::getInt32Ty(M.getContext());
         // define void @svf.main(i32, i8**, i8**)
-        Function *svfmain = (Function*)M.getOrInsertFunction(
+        FunctionCallee svfmain = M.getOrInsertFunction(
             SVF_MAIN_FUNC_NAME,
             Type::getVoidTy(M.getContext()),
             i32,i8ptr2,i8ptr2
         );
-        svfmain->setCallingConv(CallingConv::C);
-        BasicBlock* block = BasicBlock::Create(M.getContext(), "entry", svfmain);
+        Function *svfmainFn = dyn_cast<Function>(svfmain.getCallee());
+        svfmainFn->setCallingConv(CallingConv::C);
+
+        BasicBlock* block = BasicBlock::Create(M.getContext(), "entry", svfmainFn);
         IRBuilder<> Builder(block);
         // emit "call void @_GLOBAL__sub_I_XXX()"
         for(auto & init: init_funcs){
-            Function *target = (Function*)M.getOrInsertFunction(
+            FunctionCallee target = M.getOrInsertFunction(
                 init->getName(),
                 Type::getVoidTy(M.getContext())
             );
             Builder.CreateCall(target);
         }
         // main() should be called after all _GLOBAL__sub_I_XXX functions.
-        Function::arg_iterator arg_it = svfmain->arg_begin();
+        Function::arg_iterator arg_it = svfmainFn->arg_begin();
         Value * args[] = {arg_it, arg_it + 1, arg_it + 2 };
         size_t cnt = orgMain->arg_size();
         assert(cnt <= 3 && "Too many arguments for main()");

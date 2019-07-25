@@ -137,7 +137,6 @@ public:
     }
     void visitInvokeInst(llvm::InvokeInst &II) {
         visitCallSite(&II);
-        visitTerminatorInst(II);
     }
     void visitCallSite(llvm::CallSite cs);
     void visitReturnInst(llvm::ReturnInst &I);
@@ -146,9 +145,6 @@ public:
     void visitIntToPtrInst(llvm::IntToPtrInst &inst);
     void visitExtractValueInst(llvm::ExtractValueInst &EVI);
     void visitInsertValueInst(llvm::InsertValueInst &IVI) {
-    }
-    // Terminators
-    void visitTerminatorInst(llvm::TerminatorInst &TI) {
     }
     void visitBinaryOperator(llvm::BinaryOperator &I) {
     }
@@ -170,12 +166,6 @@ public:
     }
 
     /// Instruction not that often
-    void visitResumeInst(llvm::TerminatorInst &I) { /*returns void*/
-    }
-    void visitUnwindInst(llvm::TerminatorInst &I) { /*returns void*/
-    }
-    void visitUnreachableInst(llvm::TerminatorInst &I) { /*returns void*/
-    }
     void visitFenceInst(llvm::FenceInst &I) { /*returns void*/
     }
     void visitAtomicCmpXchgInst(llvm::AtomicCmpXchgInst &I) {
