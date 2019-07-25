@@ -693,6 +693,7 @@ void SymbolTableInfo::buildMemModel(SVFModule svfModule) {
 
         // collect and create symbols inside the function body
         for (inst_iterator II = inst_begin(*fun), E = inst_end(*fun); II != E; ++II) {
+            DBOUT(DMemModel, outs() << "Handle instruction " << *II << " \n");
             const Instruction *inst = &*II;
             collectSym(inst);
 
@@ -903,6 +904,10 @@ bool SymbolTableInfo::isConstantObjSym(const Value *val) {
 
             return v->isConstant();
         }
+    }
+
+    if (isa<ConstantInt>(val)) {
+        return true;
     }
     return false;
 }

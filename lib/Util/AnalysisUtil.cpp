@@ -318,7 +318,7 @@ std::string analysisUtil::getSourceLoc(const Value* val) {
             unsigned Line = Loc->getLine();
             StringRef File = Loc->getFilename();
             //StringRef Dir = Loc.getDirectory();
-            rawstr << "ln: " << Line << " fl: " << File;
+            rawstr << "ln: " << Line << " cl: " << Loc->getColumn() << " fl: " << File;
         }
     }
     else if (const Argument* argument = dyn_cast<Argument>(val)) {

@@ -386,7 +386,7 @@ void PAGBuilder::visitPHINode(PHINode &inst) {
  */
 void PAGBuilder::visitLoadInst(LoadInst &inst) {
     pag->loadInstNum++;
-    if (isa<PointerType>(inst.getType())) {
+    // if (isa<PointerType>(inst.getType())) {
         DBOUT(DPAGBuild, outs() << "process load  " << inst << " \n");
 
         NodeID dst = getValueNode(&inst);
@@ -394,7 +394,7 @@ void PAGBuilder::visitLoadInst(LoadInst &inst) {
         NodeID src = getValueNode(inst.getPointerOperand());
 
         pag->addLoadEdge(src, dst);
-    }
+    // }
 }
 
 /*!
@@ -405,7 +405,7 @@ void PAGBuilder::visitStoreInst(StoreInst &inst) {
     // StoreInst itself should always not be a pointer type
     assert(!isa<PointerType>(inst.getType()));
 
-    if (isa<PointerType>(inst.getValueOperand()->getType())) {
+    // if (isa<PointerType>(inst.getValueOperand()->getType())) {
 
         DBOUT(DPAGBuild, outs() << "process store " << inst << " \n");
 
@@ -414,7 +414,7 @@ void PAGBuilder::visitStoreInst(StoreInst &inst) {
         NodeID src = getValueNode(inst.getValueOperand());
 
         pag->addStoreEdge(src, dst);
-    }
+    // }
 
 }
 

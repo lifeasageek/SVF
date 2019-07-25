@@ -36,6 +36,7 @@
 #include "Util/CPPUtil.h"
 #include "Util/SVFModule.h"
 #include "MemoryModel/CHA.h"
+#include <list>
 #include "MemoryModel/PTAType.h"
 #include <fstream>
 #include <sstream>
@@ -43,6 +44,14 @@
 using namespace llvm;
 using namespace analysisUtil;
 using namespace cppUtil;
+
+
+static cl::opt<bool> ptsType("print-pts-type", cl::init(false),
+                             cl::desc(""));
+static cl::opt<bool> PruneTypeTest("prune-type-test", cl::init(false),
+                                   cl::desc("This is just for test"));
+static cl::opt<bool> PruneType("prune-type", cl::init(false),
+                               cl::desc(""));
 
 static cl::opt<bool> TYPEPrint("print-type", cl::init(false),
                                cl::desc("Print type"));
@@ -56,7 +65,7 @@ static cl::opt<bool> PTSPrint("print-pts", cl::init(false),
 static cl::opt<bool> PTSAllPrint("print-all-pts", cl::init(false),
                                  cl::desc("Print all points-to set of both top-level and address-taken variables"));
 
-static cl::opt<bool> PStat("stat", cl::init(true),
+static cl::opt<bool> PStat("stat", cl::init(false),
                            cl::desc("Statistic for Pointer analysis"));
 
 static cl::opt<unsigned> statBudget("statlimit",  cl::init(20),
@@ -216,12 +225,95 @@ void PointerAnalysis::dumpStat() {
         stat->performStat();
 }
 
+void PointerAnalysis::prunePtsBasedOnType() {
+    std::list<NodeID> removing_list;
+
+    for(PAG::iterator it = pag->begin(), eit = pag->end(); it!=eit; it++) {
+        // For all pag nodes, get pts set
+        const PAGNode* variable_node = it->second;
+        NodeID nodeid = it->first;
+
+        if(isa<DummyValPN>(variable_node) || isa<DummyObjPN>(variable_node))
+            continue;
+
+        llvm::Type* variable_type = variable_node->getValue()->getType();
+
+        PointsTo& pts = this->getPts(it->first);
+        // If there is no node pointed to by this node, skip
+        if(pts.empty())
+            continue;
+
+        for (PointsTo::iterator it = pts.begin(), eit = pts.end(); it != eit;it++) {
+            const PAGNode* node = pag->getPAGNode(*it);
+            NodeID nid = node->getId();
+            if(isa<ObjPN>(node) == false)
+                continue;
+            // I guess this two cases cannot give a useful information
+            // TODO: handle later
+            if (isa<DummyValPN>(node) || isa<DummyObjPN>(node)) {
+                continue;
+            }
+            // Get the type of the location pointed-to
+            llvm::Type* target_type = node->getValue()->getType();
+
+            // TODO: Keep if
+            // 1) target_type == variable_type
+            // 2) target_type == variable_type->getPointerElementType()
+            // 3) target_type == general pointer
+            // 4) variable_type == general pointer
+
+            bool beingDeleted = true;
+            if(target_type == variable_type) {
+                // 1)
+                beingDeleted = false;
+            }
+            if(PointerType *PT = dyn_cast<PointerType>(variable_type)) {
+                llvm::Type* elem_type = PT->getPointerElementType();
+                if(elem_type->isVoidTy() || elem_type->isIntegerTy()) {
+                    // 4)
+                    //beingDeleted = false;
+                }
+                if(target_type == elem_type) {
+                    // 2)
+                    beingDeleted = false;
+                }
+            }
+            if(PointerType *PT = dyn_cast<PointerType>(target_type)) {
+                if(PT->getPointerElementType()->isVoidTy() || PT->getPointerElementType()->isIntegerTy()) {
+                    beingDeleted = false;
+                }
+            }
+
+            if(beingDeleted /* TODO: some condition */) {
+                // Remove it
+                // TODO: Following line is wrong
+                //PointsTo::iterator it_ = it;
+                //pts.reset(*it);
+                removing_list.push_back(*it);
+            }
+        }
+        for(auto it = removing_list.begin();
+            it != removing_list.end();
+            ) {
+            pts.reset(*it);
+            it = removing_list.erase(it);
+        }
+        assert(removing_list.empty() && "Removing list is not empty");
+    }
+}
+
+
 
 /*!
  * Finalize the analysis after solving
  * Given the alias results, verify whether it is correct or not using alias check functions
  */
 void PointerAnalysis::finalize() {
+
+    // TODO: remove points-to information when type is different
+    if (PruneType) {
+        prunePtsBasedOnType();
+    }
 
     /// Print statistics
     dumpStat();
@@ -487,15 +579,15 @@ void BVDataPTAImpl::dumpTopLevelPtsTo() {
  */
 void PointerAnalysis::dumpPts(NodeID ptr, const PointsTo& pts) {
 
-    const PAGNode* node = pag->getPAGNode(ptr);
+    const PAGNode* pnode = pag->getPAGNode(ptr);
     /// print the points-to set of node which has the maximum pts size.
-    if (isa<DummyObjPN> (node)) {
-        outs() << "##<Dummy Obj > id:" << node->getId();
-    } else if (!isa<DummyValPN>(node) && !SVFModule::pagReadFromTXT()) {
-        outs() << "##<" << node->getValue()->getName() << "> ";
-        outs() << "Source Loc: " << getSourceLoc(node->getValue());
+    if (isa<DummyObjPN> (pnode)) {
+        outs() << "##<Dummy Obj > id:" << pnode->getId();
+    } else if (!isa<DummyValPN>(pnode)) {
+        outs() << "##<" << pnode->getValue()->getName() << "> ";
+        outs() << "Source Loc: " << getSourceLoc(pnode->getValue());
     }
-    outs() << "\nPtr " << node->getId() << " ";
+    outs() << "\nPtr " << pnode->getId() << " ";
 
     if (pts.empty()) {
         outs() << "\t\tPointsTo: {empty}\n\n";
@@ -513,19 +605,57 @@ void PointerAnalysis::dumpPts(NodeID ptr, const PointsTo& pts) {
         const PAGNode* node = pag->getPAGNode(*it);
         if(isa<ObjPN>(node) == false)
             continue;
+        if(PruneTypeTest && !(isa<DummyValPN>(pnode) || isa<DummyObjPN>(pnode)) && !(isa<DummyValPN>(node) || isa<DummyObjPN>(node))) {
+            bool flag = false;
+            // TODO: Following logic is correct?
+            llvm::Type *elem_type;
+            PointerType *ptr_type;
+            if (ptr_type = dyn_cast<PointerType>(pnode->getValue()->getType())) {
+                elem_type = ptr_type->getPointerElementType();
+                if(elem_type->isVoidTy() || elem_type->isIntegerTy()) {
+                    flag = true;
+                }
+            }
+            llvm::Type* type = node->getValue()->getType();
+            if(PointerType *PT = dyn_cast<PointerType>(type)) {
+                llvm::Type *target_type = PT->getPointerElementType();
+                if(target_type->isVoidTy() || target_type->isIntegerTy()) {
+                    flag = true;
+                }
+            }
+            if(elem_type == type || ptr_type == type) {
+                flag = true;
+            }
+            if(!flag)
+                continue;
+        }
+
         NodeID ptd = node->getId();
         outs() << "!!Target NodeID " << ptd << "\t [";
         const PAGNode* pagNode = pag->getPAGNode(ptd);
         if (isa<DummyValPN>(node))
-            outs() << "DummyVal\n";
+            outs() << "DummyVal";
         else if (isa<DummyObjPN>(node))
-            outs() << "Dummy Obj id: " << node->getId() << "]\n";
+            outs() << "Dummy Obj id: " << node->getId() << "]";
         else {
         		if(!SVFModule::pagReadFromTXT()){
         			outs() << "<" << pagNode->getValue()->getName() << "> ";
-        			outs() << "Source Loc: " << getSourceLoc(pagNode->getValue()) << "] \n";
+        			outs() << "Source Loc: " << getSourceLoc(pagNode->getValue()) << "] ";
         		}
         }
+
+        if(ptsType) {
+            // Print out target's type. This might generate a lot of output.
+            if (isa<DummyObjPN>(node) || isa<DummyValPN>(node))
+                continue;
+            llvm::Type* type = node->getValue()->getType();
+            SymbolTableInfo::Symbolnfo()->printFlattenFields(type);
+            /*
+              if (PointerType* ptType = dyn_cast<PointerType>(type))
+              SymbolTableInfo::Symbolnfo()->printFlattenFields(ptType->getElementType());
+            */
+        }
+        outs() << "\n";
     }
 }
 
@@ -605,7 +735,7 @@ void PointerAnalysis::printIndCSTargets()
 void BVDataPTAImpl::onTheFlyCallGraphSolve(const CallSiteToFunPtrMap& callsites, CallEdgeMap& newEdges,CallGraph* callgraph) {
     for(CallSiteToFunPtrMap::const_iterator iter = callsites.begin(), eiter = callsites.end(); iter!=eiter; ++iter) {
         CallSite cs = iter->first;
-        if (isVirtualCallSite(cs)) {
+        if (false) {
             const Value *vtbl = getVCallVtblPtr(cs);
             assert(pag->hasValueNode(vtbl));
             NodeID vtblId = pag->getValueNode(vtbl);

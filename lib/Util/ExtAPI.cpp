@@ -558,6 +558,8 @@ static const ei_pair ei_pairs[]= {
     {"memalign", ExtAPI::EFT_ALLOC},
     {"valloc", ExtAPI::EFT_ALLOC},
     {"SRE_LockCreate", ExtAPI::EFT_ALLOC},
+    {"kmem_cache_alloc", ExtAPI::EFT_ALLOC},
+	{"kmalloc", ExtAPI::EFT_ALLOC},
 
     {"\01mmap64", ExtAPI::EFT_NOSTRUCT_ALLOC},
     //FIXME: this is like realloc but with arg1.
@@ -687,6 +689,7 @@ static const ei_pair ei_pairs[]= {
     //C++ functions
     {"_ZdaPv", ExtAPI::EFT_FREE},	// delete
     {"_ZdlPv", ExtAPI::EFT_FREE},	// delete []
+	{"kfree", ExtAPI::EFT_FREE},
 
     {"__rawmemchr", ExtAPI::EFT_L_A0},
     {"cairo_surface_reference", ExtAPI::EFT_L_A0},
@@ -704,7 +707,6 @@ static const ei_pair ei_pairs[]= {
     {"strcat", ExtAPI::EFT_L_A0},
     {"__strcat_chk", ExtAPI::EFT_L_A0},
     {"strchr", ExtAPI::EFT_L_A0},
-    {"strcpy", ExtAPI::EFT_L_A0},
     {"strerror_r", ExtAPI::EFT_L_A0},
     {"strncat", ExtAPI::EFT_L_A0},
     {"strncpy", ExtAPI::EFT_L_A0},
@@ -735,6 +737,7 @@ static const ei_pair ei_pairs[]= {
     {"memccpy", ExtAPI::EFT_L_A0__A0R_A1R},
     {"memcpy", ExtAPI::EFT_L_A0__A0R_A1R},
     {"memmove", ExtAPI::EFT_L_A0__A0R_A1R},
+    {"strcpy", ExtAPI::EFT_L_A0__A0R_A1R},
     {"bcopy", ExtAPI::EFT_A1R_A0R},
     {"iconv", ExtAPI::EFT_A3R_A1R_NS},
     {"strtod", ExtAPI::EFT_A1R_A0},

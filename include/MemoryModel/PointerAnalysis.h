@@ -183,6 +183,7 @@ public:
 
     /// Finalization of a pointer analysis, including checking alias correctness
     virtual void finalize();
+    virtual void prunePtsBasedOnType();
 
     /// Start Analysis here (main part of pointer analysis). It needs to be implemented in child class
     virtual void analyze(SVFModule svfModule) = 0;
