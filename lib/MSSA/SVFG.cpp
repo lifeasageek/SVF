@@ -288,6 +288,8 @@ void SVFG::connectDirectSVFGEdges() {
             /// do not handle AddrSVFG node, as it is already the source of a definition
             if(isa<AddrSVFGNode>(stmtNode))
                 continue;
+            if (!hasDef(stmtNode->getPAGSrcNode()))
+                continue;
             /// for all other cases, like copy/gep/load/ret, connect the RHS pointer to its def
             addIntraDirectVFEdge(getDef(stmtNode->getPAGSrcNode()),nodeId);
 
