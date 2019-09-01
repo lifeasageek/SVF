@@ -587,7 +587,10 @@ public:
             return blkPtrSymID();
         else {
             ValueToIDMapTy::const_iterator iter =  valSymMap.find(val);
-            assert(iter!=valSymMap.end() &&"value sym not found");
+            // assert(iter!=valSymMap.end() &&"value sym not found");
+            if (iter == valSymMap.end()) {
+              return nullPtrSymID();
+            }
             return iter->second;
         }
     }
